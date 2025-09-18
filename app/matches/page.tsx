@@ -92,7 +92,7 @@ export default function MatchesPage() {
             )
           `)
           .eq('user_id', user.id)
-          .order('date', { ascending: false })
+          .order('date', { ascending: true, nullsFirst: false })
           .abortSignal(controller.signal),
         supabase
           .from('players')
@@ -107,7 +107,9 @@ export default function MatchesPage() {
         if (matchesResult.error) throw matchesResult.error
         if (playersResult.error) throw playersResult.error
 
-        setMatches(matchesResult.data || [])
+        const matchesData = matchesResult.data || []
+        console.log('Matches loaded:', matchesData.map(m => ({ id: m.id, date: m.date })))
+        setMatches(matchesData)
         setPlayers(playersResult.data || [])
         setTimeoutOccurred(false)
       }
@@ -464,7 +466,7 @@ export default function MatchesPage() {
                   type="button"
                   variant="secondary"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="mb-3 sm:mb-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="mb-3 sm:mb-0 bg-red-600 text-white hover:bg-red-700 border-red-600 hover:border-red-700"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Excluir Partida

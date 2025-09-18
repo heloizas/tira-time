@@ -618,7 +618,7 @@ export default function MatchDetailPage() {
                   type="button"
                   variant="secondary"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="mb-3 sm:mb-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  className="mb-3 sm:mb-0 bg-red-600 text-white hover:bg-red-700 border-red-600 hover:border-red-700"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Excluir Partida

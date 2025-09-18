@@ -71,7 +71,7 @@ export default function DashboardPage() {
             )
           `)
           .eq('user_id', user.id)
-          .order('date', { ascending: false })
+          .order('date', { ascending: false, nullsFirst: false })
           .limit(5)
       ])
 
