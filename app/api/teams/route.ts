@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { Player, Team } from '@/types/database'
 
 // Função para gerar times automaticamente (distribuição equilibrada)
@@ -29,16 +30,12 @@ function generateBalancedTeams(players: Player[]): { team1: Player[], team2: Pla
 // POST - Gerar times (manual ou automático)
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader) {
-      return NextResponse.json({ error: 'Token de autorização necessário' }, { status: 401 })
-    }
+    const supabase = createRouteHandlerClient({ cookies })
 
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
+      return NextResponse.json({ error: 'Usuário não autenticado' }, { status: 401 })
     }
 
     const { matchId, mode, teams } = await request.json()

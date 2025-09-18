@@ -1,190 +1,209 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { Layout } from '@/components/Layout'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { StarRating } from '@/components/ui/StarRating'
-import { Calendar, Users, Trophy, Shuffle, UserPlus, ArrowLeft } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/contexts/AuthContext'
-import { Player, Match, MatchPlayer } from '@/types/database'
-import toast from 'react-hot-toast'
-import Link from 'next/link'
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { Layout } from "@/components/Layout";
+import { Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { StarRating } from "@/components/ui/StarRating";
+import {
+  Calendar,
+  Users,
+  Trophy,
+  Shuffle,
+  ArrowLeft,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { Player, Match, MatchPlayer } from "@/types/database";
+import toast from "react-hot-toast";
+import Link from "next/link";
 
 interface MatchWithPlayers extends Match {
-  match_players: Array<MatchPlayer & {
-    players: Player
-  }>
+  match_players: Array<
+    MatchPlayer & {
+      players: Player;
+    }
+  >;
 }
 
 interface Team {
-  number: 1 | 2
-  players: Player[]
-  totalLevel: number
-  averageLevel: number
+  number: 1 | 2;
+  players: Player[];
+  totalLevel: number;
+  averageLevel: number;
 }
 
 export default function MatchDetailPage() {
-  const params = useParams()
-  const { user, loading: authLoading } = useAuth()
-  const [match, setMatch] = useState<MatchWithPlayers | null>(null)
-  const [teams, setTeams] = useState<{ team1: Team; team2: Team } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState(false)
-  const [timeoutOccurred, setTimeoutOccurred] = useState(false)
+  const params = useParams();
+  const { user, loading: authLoading } = useAuth();
+  const [match, setMatch] = useState<MatchWithPlayers | null>(null);
+  const [teams, setTeams] = useState<{ team1: Team; team2: Team } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false);
 
   useEffect(() => {
     if (user && params.id) {
-      loadMatch()
+      loadMatch();
     } else if (!authLoading) {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [user, params.id, authLoading])
+  }, [user, params.id, authLoading]);
 
   const loadMatch = async () => {
     if (!user?.id || !params.id) {
-      setLoading(false)
-      return
+      setLoading(false);
+      return;
     }
 
-    let timeoutTriggered = false
+    let timeoutTriggered = false;
 
     // Timeout de segurança
     const timeoutId = setTimeout(() => {
-      timeoutTriggered = true
-      setTimeoutOccurred(true)
-      console.warn('Match detail load timeout')
-      setLoading(false)
-      toast.error('Timeout ao carregar partida')
-    }, 15000) // 15 segundos
+      timeoutTriggered = true;
+      setTimeoutOccurred(true);
+      console.warn("Match detail load timeout");
+      setLoading(false);
+      toast.error("Timeout ao carregar partida");
+    }, 15000); // 15 segundos
 
     try {
       const { data, error } = await supabase
-        .from('matches')
-        .select(`
+        .from("matches")
+        .select(
+          `
           *,
           match_players (
             *,
             players (*)
           )
-        `)
-        .eq('id', params.id)
-        .eq('user_id', user.id)
-        .single()
+        `
+        )
+        .eq("id", params.id)
+        .eq("user_id", user.id)
+        .single();
 
       if (!timeoutTriggered) {
-        if (error) throw error
-        setMatch(data)
+        if (error) throw error;
+        setMatch(data);
         // Se já existem times definidos, calcular estatísticas
-        if (data.match_players.some((mp: MatchPlayer & { players: Player }) => mp.team === 1) && data.match_players.some((mp: MatchPlayer & { players: Player }) => mp.team === 2)) {
-          calculateTeams(data.match_players)
+        if (
+          data.match_players.some(
+            (mp: MatchPlayer & { players: Player }) => mp.team === 1
+          ) &&
+          data.match_players.some(
+            (mp: MatchPlayer & { players: Player }) => mp.team === 2
+          )
+        ) {
+          calculateTeams(data.match_players);
         }
-        setTimeoutOccurred(false)
+        setTimeoutOccurred(false);
       }
-
     } catch (error) {
       if (!timeoutTriggered) {
-        console.error('Erro ao carregar partida:', error)
-        toast.error('Partida não encontrada')
+        console.error("Erro ao carregar partida:", error);
+        toast.error("Partida não encontrada");
       }
     } finally {
-      clearTimeout(timeoutId)
+      clearTimeout(timeoutId);
       if (!timeoutTriggered) {
-        setLoading(false)
+        setLoading(false);
       }
     }
-  }
+  };
 
   const retryLoad = () => {
-    setTimeoutOccurred(false)
-    setLoading(true)
-    loadMatch()
-  }
+    setTimeoutOccurred(false);
+    setLoading(true);
+    loadMatch();
+  };
 
-  const calculateTeams = (matchPlayers: Array<MatchPlayer & { players: Player }>) => {
+  const calculateTeams = (
+    matchPlayers: Array<MatchPlayer & { players: Player }>
+  ) => {
     const team1Players = matchPlayers
-      .filter(mp => mp.team === 1)
-      .map(mp => mp.players)
-      .filter(Boolean)
+      .filter((mp) => mp.team === 1)
+      .map((mp) => mp.players)
+      .filter(Boolean);
 
     const team2Players = matchPlayers
-      .filter(mp => mp.team === 2)
-      .map(mp => mp.players)
-      .filter(Boolean)
+      .filter((mp) => mp.team === 2)
+      .map((mp) => mp.players)
+      .filter(Boolean);
 
-    const team1TotalLevel = team1Players.reduce((sum, p) => sum + p.level, 0)
-    const team2TotalLevel = team2Players.reduce((sum, p) => sum + p.level, 0)
+    const team1TotalLevel = team1Players.reduce((sum, p) => sum + p.level, 0);
+    const team2TotalLevel = team2Players.reduce((sum, p) => sum + p.level, 0);
 
     setTeams({
       team1: {
         number: 1,
         players: team1Players,
         totalLevel: team1TotalLevel,
-        averageLevel: team1Players.length > 0 ? team1TotalLevel / team1Players.length : 0
+        averageLevel:
+          team1Players.length > 0 ? team1TotalLevel / team1Players.length : 0,
       },
       team2: {
         number: 2,
         players: team2Players,
         totalLevel: team2TotalLevel,
-        averageLevel: team2Players.length > 0 ? team2TotalLevel / team2Players.length : 0
-      }
-    })
-  }
+        averageLevel:
+          team2Players.length > 0 ? team2TotalLevel / team2Players.length : 0,
+      },
+    });
+  };
 
   const generateAutomaticTeams = async () => {
-    if (!match) return
+    if (!match) return;
 
-    setGenerating(true)
+    setGenerating(true);
     try {
-      const response = await fetch('/api/teams', {
-        method: 'POST',
+      const response = await fetch("/api/teams", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           matchId: match.id,
-          mode: 'automatic'
-        })
-      })
+          mode: "automatic",
+        }),
+      });
 
-      const result = await response.json()
+      const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Erro ao gerar times')
+        throw new Error(result.error || "Erro ao gerar times");
       }
 
-      toast.success('Times gerados automaticamente!')
-      loadMatch() // Recarregar dados
+      toast.success("Times gerados automaticamente!");
+      loadMatch(); // Recarregar dados
     } catch (error) {
-      console.error('Erro ao gerar times:', error)
-      toast.error('Erro ao gerar times')
+      console.error("Erro ao gerar times:", error);
+      toast.error("Erro ao gerar times");
     } finally {
-      setGenerating(false)
+      setGenerating(false);
     }
-  }
+  };
 
   const movePlayerToTeam = async (playerId: string, newTeam: 1 | 2) => {
-    if (!match) return
+    if (!match) return;
 
     try {
       const { error } = await supabase
-        .from('match_players')
+        .from("match_players")
         .update({ team: newTeam })
-        .eq('match_id', match.id)
-        .eq('player_id', playerId)
+        .eq("match_id", match.id)
+        .eq("player_id", playerId);
 
-      if (error) throw error
+      if (error) throw error;
 
-      toast.success('Jogador movido!')
-      loadMatch() // Recarregar dados
+      toast.success("Jogador movido!");
+      loadMatch(); // Recarregar dados
     } catch (error) {
-      console.error('Erro ao mover jogador:', error)
-      toast.error('Erro ao mover jogador')
+      console.error("Erro ao mover jogador:", error);
+      toast.error("Erro ao mover jogador");
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -193,7 +212,7 @@ export default function MatchDetailPage() {
           <div className="text-gray-500">Carregando...</div>
         </div>
       </Layout>
-    )
+    );
   }
 
   if (!match) {
@@ -211,11 +230,13 @@ export default function MatchDetailPage() {
           </Link>
         </div>
       </Layout>
-    )
+    );
   }
 
-  const hasTeams = teams && (teams.team1.players.length > 0 || teams.team2.players.length > 0)
-  const isBalanced = teams && Math.abs(teams.team1.totalLevel - teams.team2.totalLevel) <= 1
+  const hasTeams =
+    teams && (teams.team1.players.length > 0 || teams.team2.players.length > 0);
+  const isBalanced =
+    teams && Math.abs(teams.team1.totalLevel - teams.team2.totalLevel) <= 1;
 
   return (
     <Layout>
@@ -223,20 +244,27 @@ export default function MatchDetailPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <Link href="/matches" className="inline-flex items-center text-gray-500 hover:text-gray-700 mb-2">
+            <Link
+              href="/matches"
+              className="inline-flex items-center text-gray-500 hover:text-gray-700 mb-2"
+            >
               <ArrowLeft className="w-4 h-4 mr-1" />
               Voltar às Partidas
             </Link>
-            <h1 className="text-3xl font-bold text-gray-900">Detalhes da Partida</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Detalhes da Partida
+            </h1>
             <div className="flex items-center text-gray-600 mt-2">
               <Calendar className="w-4 h-4 mr-2" />
               <span>
-                {new Date(match.date).toLocaleDateString('pt-BR', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
+                {new Date(match.date + "T12:00:00")
+                  .toLocaleDateString("pt-BR", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })
+                  .replace(/^\w/, (c) => c.toUpperCase())}
               </span>
             </div>
           </div>
@@ -245,10 +273,12 @@ export default function MatchDetailPage() {
             <Button
               variant="secondary"
               onClick={generateAutomaticTeams}
-              disabled={generating || match.match_players.length < 2 || timeoutOccurred}
+              disabled={
+                generating || match.match_players.length < 2 || timeoutOccurred
+              }
             >
               <Shuffle className="w-4 h-4 mr-2" />
-              {generating ? 'Gerando...' : 'Gerar Times'}
+              {generating ? "Gerando..." : "Gerar Times"}
             </Button>
           </div>
         </div>
@@ -275,7 +305,7 @@ export default function MatchDetailPage() {
                   disabled={loading}
                   className="bg-orange-600 hover:bg-orange-700"
                 >
-                  {loading ? 'Carregando...' : 'Tentar novamente'}
+                  {loading ? "Carregando..." : "Tentar novamente"}
                 </Button>
               </div>
             </CardBody>
@@ -287,7 +317,9 @@ export default function MatchDetailPage() {
           <Card>
             <CardBody className="text-center p-4">
               <Users className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-gray-900">{match.match_players.length}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {match.match_players.length}
+              </p>
               <p className="text-sm text-gray-500">Jogadores</p>
             </CardBody>
           </Card>
@@ -306,13 +338,17 @@ export default function MatchDetailPage() {
 
               <Card>
                 <CardBody className="text-center p-4">
-                  <div className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center ${
-                    isBalanced ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
-                  }`}>
+                  <div
+                    className={`w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center ${
+                      isBalanced
+                        ? "bg-green-100 text-green-600"
+                        : "bg-yellow-100 text-yellow-600"
+                    }`}
+                  >
                     ⚖️
                   </div>
                   <p className="text-2xl font-bold text-gray-900">
-                    {isBalanced ? 'Sim' : 'Não'}
+                    {isBalanced ? "Sim" : "Não"}
                   </p>
                   <p className="text-sm text-gray-500">Equilibrado</p>
                 </CardBody>
@@ -331,7 +367,8 @@ export default function MatchDetailPage() {
                   <div className="w-6 h-6 bg-purple-500 rounded mr-3"></div>
                   Time 1
                   <span className="ml-auto text-sm text-gray-500">
-                    Nível Total: {teams.team1.totalLevel} | Média: {teams.team1.averageLevel.toFixed(1)}
+                    Nível Total: {teams.team1.totalLevel} | Média:{" "}
+                    {teams.team1.averageLevel.toFixed(1)}
                   </span>
                 </h3>
               </CardHeader>
@@ -342,7 +379,9 @@ export default function MatchDetailPage() {
                     className="flex items-center justify-between p-3 bg-purple-50 rounded-lg"
                   >
                     <div className="flex items-center space-x-3">
-                      <span className="font-medium text-gray-900">{player.name}</span>
+                      <span className="font-medium text-gray-900">
+                        {player.name}
+                      </span>
                       <StarRating rating={player.level} readonly size="sm" />
                     </div>
                     <Button
@@ -355,7 +394,9 @@ export default function MatchDetailPage() {
                   </div>
                 ))}
                 {teams.team1.players.length === 0 && (
-                  <p className="text-center text-gray-500 py-4">Nenhum jogador no time</p>
+                  <p className="text-center text-gray-500 py-4">
+                    Nenhum jogador no time
+                  </p>
                 )}
               </CardBody>
             </Card>
@@ -367,7 +408,8 @@ export default function MatchDetailPage() {
                   <div className="w-6 h-6 bg-orange-500 rounded mr-3"></div>
                   Time 2
                   <span className="ml-auto text-sm text-gray-500">
-                    Nível Total: {teams.team2.totalLevel} | Média: {teams.team2.averageLevel.toFixed(1)}
+                    Nível Total: {teams.team2.totalLevel} | Média:{" "}
+                    {teams.team2.averageLevel.toFixed(1)}
                   </span>
                 </h3>
               </CardHeader>
@@ -378,7 +420,9 @@ export default function MatchDetailPage() {
                     className="flex items-center justify-between p-3 bg-orange-50 rounded-lg"
                   >
                     <div className="flex items-center space-x-3">
-                      <span className="font-medium text-gray-900">{player.name}</span>
+                      <span className="font-medium text-gray-900">
+                        {player.name}
+                      </span>
                       <StarRating rating={player.level} readonly size="sm" />
                     </div>
                     <Button
@@ -391,7 +435,9 @@ export default function MatchDetailPage() {
                   </div>
                 ))}
                 {teams.team2.players.length === 0 && (
-                  <p className="text-center text-gray-500 py-4">Nenhum jogador no time</p>
+                  <p className="text-center text-gray-500 py-4">
+                    Nenhum jogador no time
+                  </p>
                 )}
               </CardBody>
             </Card>
@@ -404,7 +450,8 @@ export default function MatchDetailPage() {
                 Jogadores da Partida
               </h3>
               <p className="text-sm text-gray-600">
-                Clique em "Gerar Times" para distribuir automaticamente ou arraste os jogadores manualmente
+                Clique em "Gerar Times" para distribuir automaticamente ou
+                arraste os jogadores manualmente
               </p>
             </CardHeader>
             <CardBody>
@@ -415,8 +462,14 @@ export default function MatchDetailPage() {
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                   >
                     <div className="flex items-center space-x-3">
-                      <span className="font-medium text-gray-900">{mp.players.name}</span>
-                      <StarRating rating={mp.players.level} readonly size="sm" />
+                      <span className="font-medium text-gray-900">
+                        {mp.players.name}
+                      </span>
+                      <StarRating
+                        rating={mp.players.level}
+                        readonly
+                        size="sm"
+                      />
                     </div>
                   </div>
                 ))}
@@ -432,14 +485,21 @@ export default function MatchDetailPage() {
           </CardHeader>
           <CardBody>
             <div className="space-y-2 text-sm text-gray-600">
-              <p>• Use "Gerar Times" para distribuição automática baseada nos níveis dos jogadores</p>
-              <p>• Você pode mover jogadores entre os times clicando nas setas</p>
+              <p>
+                • Use "Gerar Times" para distribuição automática baseada nos
+                níveis dos jogadores
+              </p>
+              <p>
+                • Você pode mover jogadores entre os times clicando nas setas
+              </p>
               <p>• Times equilibrados têm diferença de nível total ≤ 1</p>
-              <p>• A média de nível de cada time ajuda a identificar o equilíbrio</p>
+              <p>
+                • A média de nível de cada time ajuda a identificar o equilíbrio
+              </p>
             </div>
           </CardBody>
         </Card>
       </div>
     </Layout>
-  )
+  );
 }

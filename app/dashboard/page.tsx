@@ -28,18 +28,18 @@ export default function DashboardPage() {
   useEffect(() => {
     console.log('Dashboard: Auth state changed:', { authLoading, userId: user?.id, userReady })
 
-    if (!authLoading && user?.id) {
+    if (!authLoading && user?.id && !userReady) {
       // Pequeno delay para garantir que a sessão esteja completamente estabelecida
       const timer = setTimeout(() => {
         console.log('Dashboard: User ready, enabling data fetch for user:', user.id)
         setUserReady(true)
       }, 200) // Aumentado para 200ms
       return () => clearTimeout(timer)
-    } else if (!user) {
+    } else if (!authLoading && !user && userReady) {
       console.log('Dashboard: No user, disabling data fetch')
       setUserReady(false)
     }
-  }, [user?.id, authLoading, userReady])
+  }, [user?.id, authLoading])
 
   // Função para carregar dados do dashboard
   const fetchDashboardData = useMemo(() => {
