@@ -65,7 +65,7 @@ export default function PlayersPage() {
         .from('players')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .order('name')
         .abortSignal(controller.signal)
 
       // Se não houve timeout, processa os dados normalmente

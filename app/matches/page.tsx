@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { PlayerDropdownChip } from '@/components/ui/PlayerDropdownChip'
-import { Plus, Calendar, Users, Trophy, Edit, Trash2 } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -587,69 +587,53 @@ export default function MatchesPage() {
         ) : (
           <div className="space-y-4">
             {matches.map((match) => (
-              <Card key={match.id}>
-                <CardBody className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center text-gray-600">
-                        <Calendar className="w-4 h-4 mr-2" />
-                        <span className="font-medium">
-                          {new Date(match.date + 'T12:00:00').toLocaleDateString('pt-BR', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          }).replace(/^\w/, c => c.toUpperCase())}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => openEditModal(match)}
-                        disabled={timeoutOccurred}
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Editar
-                      </Button>
-                      <Link href={`/matches/${match.id}`}>
-                        <Button variant="secondary" size="sm">
-                          <Trophy className="w-4 h-4 mr-2" />
-                          Tira Time
-                        </Button>
-                      </Link>
-                    </div>
-
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <Users className="w-4 h-4 mr-1" />
-                        <span>{match.match_players?.length || 0} jogadores</span>
-                      </div>
-                    </div>
-
-                    {/* Jogadores da partida */}
-                    <div>
-                      <div className="flex flex-wrap gap-2">
-                        {match.match_players?.slice(0, 5).map((mp, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700"
-                          >
-                            {mp.players?.name}
+              <Link key={match.id} href={`/matches/${match.id}`}>
+                <Card className="cursor-pointer hover:shadow-md transition-shadow mb-4">
+                  <CardBody className="p-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center text-gray-600">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          <span className="font-medium">
+                            {new Date(match.date + 'T12:00:00').toLocaleDateString('pt-BR', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            }).replace(/^\w/, c => c.toUpperCase())}
                           </span>
-                        ))}
-                        {(match.match_players?.length || 0) > 5 && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
-                            +{(match.match_players?.length || 0) - 5} mais
-                          </span>
-                        )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <Users className="w-4 h-4 mr-1" />
+                          <span>{match.match_players?.length || 0} jogadores</span>
+                        </div>
+                      </div>
+
+                      {/* Jogadores da partida */}
+                      <div>
+                        <div className="flex flex-wrap gap-2">
+                          {match.match_players?.slice(0, 5).map((mp, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700"
+                            >
+                              {mp.players?.name}
+                            </span>
+                          ))}
+                          {(match.match_players?.length || 0) > 5 && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                              +{(match.match_players?.length || 0) - 5} mais
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardBody>
-              </Card>
+                  </CardBody>
+                </Card>
+              </Link>
             ))}
           </div>
         )}

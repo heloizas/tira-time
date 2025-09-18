@@ -30,10 +30,10 @@ export function Layout({ children }: LayoutProps) {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <Link href="/dashboard" className="flex items-center cursor-pointer hover:opacity-80 transition-opacity">
               <Trophy className="w-8 h-8 text-purple-600 mr-3" />
               <h1 className="text-xl font-bold text-gray-900">Tira Time</h1>
-            </div>
+            </Link>
 
             <div className="flex items-center space-x-4">
               {profile?.name && (
