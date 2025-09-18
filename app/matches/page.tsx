@@ -11,7 +11,7 @@ import { Plus, Calendar, Users, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { Player, Match } from '@/types/database'
+import { Player, Match, MatchPlayer } from '@/types/database'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
@@ -21,9 +21,11 @@ interface MatchForm {
 }
 
 interface MatchWithPlayers extends Match {
-  match_players: Array<{
-    players: Player
-  }>
+  match_players: Array<
+    MatchPlayer & {
+      players: Player;
+    }
+  >;
 }
 
 export default function MatchesPage() {
