@@ -60,7 +60,7 @@ export default function MatchDetailPage() {
       setMatch(data)
 
       // Se já existem times definidos, calcular estatísticas
-      if (data.match_players.some(mp => mp.team === 1) && data.match_players.some(mp => mp.team === 2)) {
+      if (data.match_players.some((mp: MatchPlayer & { players: Player }) => mp.team === 1) && data.match_players.some((mp: MatchPlayer & { players: Player }) => mp.team === 2)) {
         calculateTeams(data.match_players)
       }
 
