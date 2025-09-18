@@ -20,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [lastCallbackTime, setLastCallbackTime] = useState(0)
 
   useEffect(() => {
     // Carrega usuário atual e mantém sessão sincronizada via auth-helpers
@@ -57,14 +58,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Notifica o backend para sincronizar cookies no Next middleware
-        try {
-          await fetch('/auth/callback', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event, session }),
-          })
-        } catch (e) {
-          // ignora erro de rede
+        // Adiciona throttling para evitar múltiplas chamadas
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          const now = Date.now()
+          if (now - lastCallbackTime > 1000) { // Mínimo 1 segundo entre chamadas
+            setLastCallbackTime(now)
+            try {
+              await fetch('/auth/callback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event, session }),
+              })
+            } catch (e) {
+              // ignora erro de rede
+            }
+          }
         }
 
         setLoading(false)
@@ -78,7 +86,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (!error) {
-      try { await fetch('/auth/callback', { method: 'POST' }) } catch {}
       window.location.replace('/dashboard')
     }
 
@@ -93,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     if (!error) {
-      try { await fetch('/auth/callback', { method: 'POST' }) } catch {}
       window.location.replace('/dashboard')
     }
 
@@ -102,7 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    try { await fetch('/auth/callback', { method: 'POST' }) } catch {}
     window.location.replace('/')
   }
 
