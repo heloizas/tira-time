@@ -8,6 +8,7 @@ import { Users, Calendar, Trophy, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import toast from 'react-hot-toast'
 
 interface DashboardStats {
   totalPlayers: number
@@ -20,7 +21,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [stats, setStats] = useState<DashboardStats>({
     totalPlayers: 0,
     totalMatches: 0,
@@ -31,34 +32,54 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user) {
       loadDashboardData()
+    } else if (!authLoading) {
+      setLoading(false)
     }
-  }, [user])
+  }, [user, authLoading])
 
   const loadDashboardData = async () => {
+    if (!user?.id) {
+      setLoading(false)
+      return
+    }
+
+    // Timeout de segurança
+    const timeoutId = setTimeout(() => {
+      console.warn('Dashboard data load timeout')
+      setLoading(false)
+      toast.error('Timeout ao carregar dados')
+    }, 15000) // 15 segundos
+
     try {
       // Buscar total de jogadores
-      const { count: playersCount } = await supabase
+      const { count: playersCount, error: playersError } = await supabase
         .from('players')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
+
+      if (playersError) throw playersError
 
       // Buscar total de partidas
-      const { count: matchesCount } = await supabase
+      const { count: matchesCount, error: matchesError } = await supabase
         .from('matches')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
+
+      if (matchesError) throw matchesError
 
       // Buscar partidas recentes com contagem de jogadores
-      const { data: recentMatches } = await supabase
+      const { data: recentMatches, error: recentError } = await supabase
         .from('matches')
         .select(`
           id,
           date,
           match_players (count)
         `)
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5)
+
+      if (recentError) throw recentError
 
       setStats({
         totalPlayers: playersCount || 0,
@@ -71,7 +92,9 @@ export default function DashboardPage() {
       })
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error)
+      toast.error('Erro ao carregar dados do dashboard')
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
   }

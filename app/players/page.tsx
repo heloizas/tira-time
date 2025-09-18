@@ -19,7 +19,7 @@ interface PlayerForm {
 }
 
 export default function PlayersPage() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -35,15 +35,29 @@ export default function PlayersPage() {
   useEffect(() => {
     if (user) {
       loadPlayers()
+    } else if (!authLoading) {
+      setLoading(false)
     }
-  }, [user])
+  }, [user, authLoading])
 
   const loadPlayers = async () => {
+    if (!user?.id) {
+      setLoading(false)
+      return
+    }
+
+    // Timeout de segurança
+    const timeoutId = setTimeout(() => {
+      console.warn('Players data load timeout')
+      setLoading(false)
+      toast.error('Timeout ao carregar jogadores')
+    }, 15000) // 15 segundos
+
     try {
       const { data, error } = await supabase
         .from('players')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -53,6 +67,7 @@ export default function PlayersPage() {
       console.error('Erro ao carregar jogadores:', error)
       toast.error('Erro ao carregar jogadores')
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
   }

@@ -11,7 +11,7 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
-  const baseClasses = 'font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2'
+  const baseClasses = 'font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 flex items-center justify-center'
 
   const variantClasses = {
     primary: 'bg-purple-600 hover:bg-purple-700 text-white focus:ring-purple-500',

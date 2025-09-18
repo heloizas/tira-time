@@ -25,7 +25,7 @@ interface MatchWithPlayers extends Match {
 }
 
 export default function MatchesPage() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [matches, setMatches] = useState<MatchWithPlayers[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,10 +42,24 @@ export default function MatchesPage() {
   useEffect(() => {
     if (user) {
       loadData()
+    } else if (!authLoading) {
+      setLoading(false)
     }
-  }, [user])
+  }, [user, authLoading])
 
   const loadData = async () => {
+    if (!user?.id) {
+      setLoading(false)
+      return
+    }
+
+    // Timeout de segurança
+    const timeoutId = setTimeout(() => {
+      console.warn('Matches data load timeout')
+      setLoading(false)
+      toast.error('Timeout ao carregar dados')
+    }, 15000) // 15 segundos
+
     try {
       // Carregar partidas
       const { data: matchesData, error: matchesError } = await supabase
@@ -56,7 +70,7 @@ export default function MatchesPage() {
             players (*)
           )
         `)
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('date', { ascending: false })
 
       if (matchesError) throw matchesError
@@ -65,7 +79,7 @@ export default function MatchesPage() {
       const { data: playersData, error: playersError } = await supabase
         .from('players')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('name')
 
       if (playersError) throw playersError
@@ -74,8 +88,9 @@ export default function MatchesPage() {
       setPlayers(playersData || [])
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
-      toast.error('Erro ao carregar dados')
+      toast.error('Erro ao carregar dados das partidas')
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
   }

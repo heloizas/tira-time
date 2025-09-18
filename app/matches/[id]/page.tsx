@@ -28,7 +28,7 @@ interface Team {
 
 export default function MatchDetailPage() {
   const params = useParams()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [match, setMatch] = useState<MatchWithPlayers | null>(null)
   const [teams, setTeams] = useState<{ team1: Team; team2: Team } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -37,10 +37,24 @@ export default function MatchDetailPage() {
   useEffect(() => {
     if (user && params.id) {
       loadMatch()
+    } else if (!authLoading) {
+      setLoading(false)
     }
-  }, [user, params.id])
+  }, [user, params.id, authLoading])
 
   const loadMatch = async () => {
+    if (!user?.id || !params.id) {
+      setLoading(false)
+      return
+    }
+
+    // Timeout de segurança
+    const timeoutId = setTimeout(() => {
+      console.warn('Match detail load timeout')
+      setLoading(false)
+      toast.error('Timeout ao carregar partida')
+    }, 15000) // 15 segundos
+
     try {
       const { data, error } = await supabase
         .from('matches')
@@ -52,7 +66,7 @@ export default function MatchDetailPage() {
           )
         `)
         .eq('id', params.id)
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .single()
 
       if (error) throw error
@@ -68,6 +82,7 @@ export default function MatchDetailPage() {
       console.error('Erro ao carregar partida:', error)
       toast.error('Partida não encontrada')
     } finally {
+      clearTimeout(timeoutId)
       setLoading(false)
     }
   }
