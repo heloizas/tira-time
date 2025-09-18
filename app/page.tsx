@@ -30,6 +30,19 @@ export default function HomePage() {
   const loginForm = useForm<LoginForm>()
   const registerForm = useForm<RegisterForm>()
 
+  // Limpar formulários ao trocar de modo
+  const switchToLogin = () => {
+    setIsLogin(true)
+    loginForm.reset()
+    registerForm.reset()
+  }
+
+  const switchToRegister = () => {
+    setIsLogin(false)
+    loginForm.reset()
+    registerForm.reset()
+  }
+
   // O middleware já cuida do redirecionamento quando o usuário está logado
 
   const handleLogin = async (data: LoginForm) => {
@@ -108,7 +121,7 @@ export default function HomePage() {
               <Button
                 variant={isLogin ? 'primary' : 'secondary'}
                 size="sm"
-                onClick={() => setIsLogin(true)}
+                onClick={switchToLogin}
                 className="rounded-r-none"
               >
                 Entrar
@@ -116,7 +129,7 @@ export default function HomePage() {
               <Button
                 variant={!isLogin ? 'primary' : 'secondary'}
                 size="sm"
-                onClick={() => setIsLogin(false)}
+                onClick={switchToRegister}
                 className="rounded-l-none"
               >
                 Cadastrar
