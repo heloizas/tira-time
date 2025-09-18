@@ -121,7 +121,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 gap-3">
           <Card>
             <CardBody className="flex items-center p-6">
               <div className="flex items-center">
@@ -149,24 +149,10 @@ export default function DashboardPage() {
               </div>
             </CardBody>
           </Card>
-
-          <Card>
-            <CardBody className="flex items-center p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Trophy className="w-6 h-6 text-green-600" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Times Gerados</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalMatches}</p>
-                </div>
-              </div>
-            </CardBody>
-          </Card>
         </div>
 
         {/* Ações Rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-gray-900">Ações Rápidas</h3>
