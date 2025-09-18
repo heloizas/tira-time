@@ -36,9 +36,11 @@ export function Layout({ children }: LayoutProps) {
             </div>
 
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">
-                Olá, {profile?.name || user.email}!
-              </span>
+              {profile?.name && (
+                <span className="text-sm text-gray-600">
+                  Olá, {profile.name.split(' ')[0]}!
+                </span>
+              )}
               <Button
                 variant="secondary"
                 size="sm"

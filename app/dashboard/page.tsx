@@ -76,7 +76,9 @@ export default function DashboardPage() {
         .select(`
           id,
           date,
-          match_players (count)
+          match_players (
+            player_id
+          )
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
@@ -234,7 +236,12 @@ export default function DashboardPage() {
                     >
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {new Date(match.date).toLocaleDateString('pt-BR')}
+                          {new Date(match.date + 'T12:00:00').toLocaleDateString('pt-BR', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          }).replace(/^\w/, c => c.toUpperCase())}
                         </p>
                         <p className="text-xs text-gray-500">
                           {match.playerCount} jogadores

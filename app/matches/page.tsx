@@ -325,12 +325,12 @@ export default function MatchesPage() {
                         <div className="flex items-center text-gray-600">
                           <Calendar className="w-4 h-4 mr-2" />
                           <span className="font-medium">
-                            {new Date(match.date).toLocaleDateString('pt-BR', {
+                            {new Date(match.date + 'T12:00:00').toLocaleDateString('pt-BR', {
                               weekday: 'long',
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric'
-                            })}
+                            }).replace(/^\w/, c => c.toUpperCase())}
                           </span>
                         </div>
                       </div>
