@@ -84,16 +84,15 @@ export function PlayerDropdownChip({
                       className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-700"
                     >
                       {name}
-                      <button
-                        type="button"
+                      <span
                         onClick={(e) => {
                           e.stopPropagation()
                           removePlayer(selectedPlayers[index])
                         }}
-                        className="ml-1 hover:bg-purple-200 rounded-full p-0.5"
+                        className="ml-1 hover:bg-purple-200 rounded-full p-0.5 cursor-pointer"
                       >
                         <X className="w-3 h-3" />
-                      </button>
+                      </span>
                     </span>
                   ))}
                 </div>
