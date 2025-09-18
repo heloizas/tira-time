@@ -20,18 +20,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [lastCallbackTime, setLastCallbackTime] = useState(0)
-
   useEffect(() => {
+    let isMounted = true
+    let lastCallbackTime = 0
+
     // Carrega usuário atual e mantém sessão sincronizada via auth-helpers
     const init = async () => {
       try {
+        console.log('AuthContext: Initializing auth...')
         const { data: { user }, error } = await supabase.auth.getUser()
-        if (error) throw error
+        if (error || !isMounted) {
+          console.log('AuthContext: No user or mount error:', error?.message)
+          return
+        }
 
+        console.log('AuthContext: User found:', user?.id)
         setUser(user)
 
-        if (user) {
+        if (user && isMounted) {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
@@ -41,22 +47,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (profileError && profileError.code !== 'PGRST116') { // Ignore not found
             console.warn('Profile load error:', profileError)
           }
-          setProfile(profile)
+          if (isMounted) {
+            setProfile(profile)
+          }
         }
       } catch (error) {
         console.error('Auth initialization error:', error)
-        setUser(null)
-        setProfile(null)
+        if (isMounted) {
+          setUser(null)
+          setProfile(null)
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          console.log('AuthContext: Auth initialization complete')
+          setLoading(false)
+        }
       }
     }
 
-    // Timeout de segurança para evitar loading infinito
+    // Timeout de segurança reduzido para melhor UX
     const initTimeout = setTimeout(() => {
-      console.warn('Auth initialization timeout')
-      setLoading(false)
-    }, 10000) // 10 segundos
+      if (isMounted) {
+        console.warn('Auth initialization timeout')
+        setLoading(false)
+      }
+    }, 5000) // 5 segundos
 
     init().finally(() => {
       clearTimeout(initTimeout)
@@ -64,10 +79,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return
+
+        console.log('AuthContext: Auth state change:', event, session?.user?.id)
+
         try {
           setUser(session?.user ?? null)
 
-          if (session?.user) {
+          if (session?.user && isMounted) {
+            console.log('AuthContext: Loading profile for user:', session.user.id)
             const { data: profile, error: profileError } = await supabase
               .from('profiles')
               .select('*')
@@ -77,8 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (profileError && profileError.code !== 'PGRST116') { // Ignore not found
               console.warn('Profile load error:', profileError)
             }
-            setProfile(profile)
-          } else {
+            if (isMounted) {
+              setProfile(profile)
+            }
+          } else if (isMounted) {
+            console.log('AuthContext: No user, clearing profile')
             setProfile(null)
           }
 
@@ -87,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
             const now = Date.now()
             if (now - lastCallbackTime > 1000) { // Mínimo 1 segundo entre chamadas
-              setLastCallbackTime(now)
+              lastCallbackTime = now
               try {
                 await fetch('/auth/callback', {
                   method: 'POST',
@@ -102,22 +125,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
           console.error('Auth state change error:', error)
         } finally {
-          setLoading(false)
+          if (isMounted) {
+            setLoading(false)
+          }
         }
       }
     )
 
     return () => {
+      isMounted = false
       clearTimeout(initTimeout)
       subscription.unsubscribe()
     }
-  }, [lastCallbackTime])
+  }, [])
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (!error) {
-      window.location.replace('/dashboard')
+      // Aguardar um pouco para garantir que o estado seja atualizado
+      setTimeout(() => {
+        window.location.replace('/dashboard')
+      }, 100)
     }
 
     return { error: error?.message || null }

@@ -56,51 +56,64 @@ export default function MatchesPage() {
       return
     }
 
+    const controller = new AbortController()
     let timeoutTriggered = false
 
-    // Timeout de segurança
+    // Timeout de segurança reduzido
     const timeoutId = setTimeout(() => {
       timeoutTriggered = true
+      controller.abort()
       setTimeoutOccurred(true)
       console.warn('Matches data load timeout')
       setLoading(false)
       toast.error('Timeout ao carregar dados')
-    }, 15000) // 15 segundos
+    }, 8000) // 8 segundos
 
     try {
-      // Carregar partidas
-      const { data: matchesData, error: matchesError } = await supabase
-        .from('matches')
-        .select(`
-          *,
-          match_players (
-            players (*)
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
+      // Executar queries em paralelo para melhor performance
+      const [matchesResult, playersResult] = await Promise.all([
+        supabase
+          .from('matches')
+          .select(`
+            *,
+            match_players (
+              players (*)
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('date', { ascending: false })
+          .abortSignal(controller.signal),
+        supabase
+          .from('players')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('name')
+          .abortSignal(controller.signal)
+      ])
 
       if (!timeoutTriggered) {
-        if (matchesError) throw matchesError
-        setMatches(matchesData || [])
-      }
+        // Verificar erros
+        if (matchesResult.error) throw matchesResult.error
+        if (playersResult.error) throw playersResult.error
 
-      // Carregar jogadores
-      const { data: playersData, error: playersError } = await supabase
-        .from('players')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name')
-
-      if (!timeoutTriggered) {
-        if (playersError) throw playersError
-        setPlayers(playersData || [])
+        setMatches(matchesResult.data || [])
+        setPlayers(playersResult.data || [])
         setTimeoutOccurred(false)
       }
-    } catch (error) {
-      if (!timeoutTriggered) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err))
+      if (!timeoutTriggered && error.name !== 'AbortError') {
         console.error('Erro ao carregar dados:', error)
-        toast.error('Erro ao carregar dados das partidas')
+
+        // Mensagens de erro mais específicas
+        if (error.message?.includes('JWT')) {
+          toast.error('Sessão expirada. Recarregue a página.')
+        } else if (error.message?.includes('network')) {
+          toast.error('Erro de conexão. Verifique sua internet.')
+          setTimeoutOccurred(true)
+        } else {
+          toast.error('Erro ao carregar dados das partidas')
+        }
       }
     } finally {
       clearTimeout(timeoutId)

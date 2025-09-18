@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { Layout } from '@/components/Layout'
 import { Card, CardBody, CardHeader } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -8,7 +8,7 @@ import { Users, Calendar, Trophy, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import toast from 'react-hot-toast'
+import { useAsyncData } from '@/hooks/useAsyncData'
 
 interface DashboardStats {
   totalPlayers: number
@@ -22,100 +22,91 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth()
-  const [stats, setStats] = useState<DashboardStats>({
-    totalPlayers: 0,
-    totalMatches: 0,
-    recentMatches: []
-  })
-  const [loading, setLoading] = useState(true)
-  const [timeoutOccurred, setTimeoutOccurred] = useState(false)
+  const [userReady, setUserReady] = useState(false)
 
+  // Aguarda o usuário estar completamente carregado após login
   useEffect(() => {
-    if (user) {
-      loadDashboardData()
-    } else if (!authLoading) {
-      setLoading(false)
+    console.log('Dashboard: Auth state changed:', { authLoading, userId: user?.id, userReady })
+
+    if (!authLoading && user?.id) {
+      // Pequeno delay para garantir que a sessão esteja completamente estabelecida
+      const timer = setTimeout(() => {
+        console.log('Dashboard: User ready, enabling data fetch for user:', user.id)
+        setUserReady(true)
+      }, 200) // Aumentado para 200ms
+      return () => clearTimeout(timer)
+    } else if (!user) {
+      console.log('Dashboard: No user, disabling data fetch')
+      setUserReady(false)
     }
-  }, [user, authLoading])
+  }, [user?.id, authLoading, userReady])
 
-  const loadDashboardData = async () => {
-    if (!user?.id) {
-      setLoading(false)
-      return
+  // Função para carregar dados do dashboard
+  const fetchDashboardData = useMemo(() => {
+    return async (): Promise<DashboardStats | null> => {
+      if (!user?.id) {
+        console.log('Dashboard: No user ID available')
+        return null
+      }
+
+      console.log('Dashboard: Fetching data for user:', user.id)
+
+      // Executar queries em paralelo para melhor performance
+      const [playersResult, matchesResult, recentResult] = await Promise.all([
+        supabase
+          .from('players')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('matches')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+        supabase
+          .from('matches')
+          .select(`
+            id,
+            date,
+            match_players (
+              player_id
+            )
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5)
+      ])
+
+      // Verificar erros
+      if (playersResult.error) throw playersResult.error
+      if (matchesResult.error) throw matchesResult.error
+      if (recentResult.error) throw recentResult.error
+
+      const stats = {
+        totalPlayers: playersResult.count || 0,
+        totalMatches: matchesResult.count || 0,
+        recentMatches: recentResult.data?.map(match => ({
+          id: match.id,
+          date: match.date,
+          playerCount: match.match_players?.length || 0
+        })) || []
+      }
+
+      console.log('Dashboard: Fetched stats:', stats)
+      return stats
     }
+  }, [user?.id])
 
-    let timeoutTriggered = false
+  const {
+    data: stats,
+    loading,
+    timeoutOccurred,
+    retry: retryLoad
+  } = useAsyncData({
+    fetchFn: fetchDashboardData,
+    deps: [user?.id, userReady],
+    enabled: userReady && !!user?.id
+  })
 
-    // Timeout de segurança
-    const timeoutId = setTimeout(() => {
-      timeoutTriggered = true
-      setTimeoutOccurred(true)
-      console.warn('Dashboard data load timeout')
-      setLoading(false)
-      toast.error('Timeout ao carregar dados')
-    }, 15000) // 15 segundos
-
-    try {
-      // Buscar total de jogadores
-      const { count: playersCount, error: playersError } = await supabase
-        .from('players')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-      if (!timeoutTriggered && playersError) throw playersError
-
-      // Buscar total de partidas
-      const { count: matchesCount, error: matchesError } = await supabase
-        .from('matches')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-      if (!timeoutTriggered && matchesError) throw matchesError
-
-      // Buscar partidas recentes com contagem de jogadores
-      const { data: recentMatches, error: recentError } = await supabase
-        .from('matches')
-        .select(`
-          id,
-          date,
-          match_players (
-            player_id
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5)
-      if (!timeoutTriggered) {
-        if (recentError) throw recentError
-        setStats({
-          totalPlayers: playersCount || 0,
-          totalMatches: matchesCount || 0,
-          recentMatches: recentMatches?.map(match => ({
-            id: match.id,
-            date: match.date,
-            playerCount: match.match_players?.length || 0
-          })) || []
-        })
-        setTimeoutOccurred(false)
-      }
-    } catch (error) {
-      if (!timeoutTriggered) {
-        console.error('Erro ao carregar dados do dashboard:', error)
-        toast.error('Erro ao carregar dados do dashboard')
-      }
-    } finally {
-      clearTimeout(timeoutId)
-      if (!timeoutTriggered) {
-        setLoading(false)
-      }
-    }
-  }
-
-  const retryLoad = () => {
-    setTimeoutOccurred(false)
-    setLoading(true)
-    loadDashboardData()
-  }
-
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">
@@ -123,6 +114,13 @@ export default function DashboardPage() {
         </div>
       </Layout>
     )
+  }
+
+  // Usar valores padrão se não houver dados
+  const dashboardStats = stats || {
+    totalPlayers: 0,
+    totalMatches: 0,
+    recentMatches: []
   }
 
   return (
@@ -175,7 +173,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Jogadores</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalPlayers}</p>
+                  <p className="text-2xl font-bold text-gray-900">{dashboardStats.totalPlayers}</p>
                 </div>
               </div>
             </CardBody>
@@ -189,7 +187,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Partidas</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalMatches}</p>
+                  <p className="text-2xl font-bold text-gray-900">{dashboardStats.totalMatches}</p>
                 </div>
               </div>
             </CardBody>
@@ -223,13 +221,13 @@ export default function DashboardPage() {
               <h3 className="text-lg font-semibold text-gray-900">Partidas Recentes</h3>
             </CardHeader>
             <CardBody>
-              {stats.recentMatches.length === 0 ? (
+              {dashboardStats.recentMatches.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">
                   Nenhuma partida criada ainda
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {stats.recentMatches.map((match) => (
+                  {dashboardStats.recentMatches.map((match) => (
                     <div
                       key={match.id}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"

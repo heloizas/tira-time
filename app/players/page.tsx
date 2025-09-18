@@ -47,16 +47,18 @@ export default function PlayersPage() {
       return
     }
 
+    const controller = new AbortController()
     let timeoutTriggered = false
 
-    // Timeout de segurança
+    // Timeout de segurança reduzido
     const timeoutId = setTimeout(() => {
       timeoutTriggered = true
+      controller.abort()
       setTimeoutOccurred(true)
       console.warn('Players data load timeout')
       setLoading(false)
       toast.error('Timeout ao carregar jogadores')
-    }, 15000) // 15 segundos
+    }, 8000) // 8 segundos
 
     try {
       const { data, error } = await supabase
@@ -64,6 +66,7 @@ export default function PlayersPage() {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
+        .abortSignal(controller.signal)
 
       // Se não houve timeout, processa os dados normalmente
       if (!timeoutTriggered) {
@@ -71,10 +74,20 @@ export default function PlayersPage() {
         setPlayers(data || [])
         setTimeoutOccurred(false) // Reset timeout flag on success
       }
-    } catch (error) {
-      if (!timeoutTriggered) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err))
+      if (!timeoutTriggered && error.name !== 'AbortError') {
         console.error('Erro ao carregar jogadores:', error)
-        toast.error('Erro ao carregar jogadores')
+
+        // Mensagens de erro mais específicas
+        if (error.message?.includes('JWT')) {
+          toast.error('Sessão expirada. Recarregue a página.')
+        } else if (error.message?.includes('network')) {
+          toast.error('Erro de conexão. Verifique sua internet.')
+          setTimeoutOccurred(true)
+        } else {
+          toast.error('Erro ao carregar jogadores')
+        }
       }
     } finally {
       clearTimeout(timeoutId)
@@ -133,7 +146,8 @@ export default function PlayersPage() {
       setShowForm(false)
       setEditingPlayer(null)
       loadPlayers()
-    } catch (error) {
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err))
       console.error('Erro ao salvar jogador:', error)
 
       // Mensagens de erro mais específicas
