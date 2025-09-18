@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { Layout } from '@/components/Layout'
-import { Card, CardBody, CardHeader } from '@/components/ui/Card'
+import { Card, CardBody } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Modal } from '@/components/ui/Modal'
+import { PlayerDropdownChip } from '@/components/ui/PlayerDropdownChip'
 import { Plus, Calendar, Users, Trophy } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { supabase } from '@/lib/supabase'
@@ -29,7 +31,7 @@ export default function MatchesPage() {
   const [matches, setMatches] = useState<MatchWithPlayers[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
 
   const form = useForm<MatchForm>({
@@ -95,15 +97,9 @@ export default function MatchesPage() {
     }
   }
 
-  const handlePlayerToggle = (playerId: string) => {
-    setSelectedPlayers(prev => {
-      const newSelected = prev.includes(playerId)
-        ? prev.filter(id => id !== playerId)
-        : [...prev, playerId]
-
-      form.setValue('selectedPlayers', newSelected)
-      return newSelected
-    })
+  const handlePlayersChange = (playerIds: string[]) => {
+    setSelectedPlayers(playerIds)
+    form.setValue('selectedPlayers', playerIds)
   }
 
   const handleSubmit = async (data: MatchForm) => {
@@ -144,7 +140,7 @@ export default function MatchesPage() {
       toast.success('Partida criada com sucesso!')
       form.reset()
       setSelectedPlayers([])
-      setShowForm(false)
+      setShowModal(false)
       loadData()
     } catch (error) {
       console.error('Erro ao criar partida:', error)
@@ -155,7 +151,7 @@ export default function MatchesPage() {
   const resetForm = () => {
     form.reset()
     setSelectedPlayers([])
-    setShowForm(false)
+    setShowModal(false)
   }
 
   if (loading) {
@@ -180,7 +176,7 @@ export default function MatchesPage() {
             </p>
           </div>
           <Button
-            onClick={() => setShowForm(true)}
+            onClick={() => setShowModal(true)}
             className="mt-4 sm:mt-0"
             disabled={players.length < 2}
           >
@@ -210,80 +206,48 @@ export default function MatchesPage() {
           </Card>
         )}
 
-        {/* Formulário */}
-        {showForm && players.length >= 2 && (
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-gray-900">Nova Partida</h3>
-            </CardHeader>
-            <CardBody>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <Input
-                  label="Data da Partida"
-                  type="date"
-                  {...form.register('date', { required: 'Data é obrigatória' })}
-                  error={form.formState.errors.date?.message}
-                />
+        {/* Modal de Nova Partida */}
+        <Modal
+          isOpen={showModal}
+          onClose={resetForm}
+          title="Nova Partida"
+          footer={
+            <>
+              <Button
+                type="button"
+                onClick={form.handleSubmit(handleSubmit)}
+                disabled={form.formState.isSubmitting || selectedPlayers.length < 2}
+                className="w-full sm:ml-3 sm:w-auto"
+              >
+                {form.formState.isSubmitting ? 'Criando...' : 'Criar Partida'}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={resetForm}
+                className="mt-3 w-full sm:mt-0 sm:w-auto"
+              >
+                Cancelar
+              </Button>
+            </>
+          }
+        >
+          <form className="space-y-6">
+            <Input
+              label="Data da Partida"
+              type="date"
+              {...form.register('date', { required: 'Data é obrigatória' })}
+              error={form.formState.errors.date?.message}
+            />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Selecionar Jogadores ({selectedPlayers.length} selecionados)
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto border rounded-lg p-4">
-                    {players.map((player) => (
-                      <div
-                        key={player.id}
-                        className={`
-                          p-3 rounded-lg border-2 cursor-pointer transition-all duration-200
-                          ${selectedPlayers.includes(player.id)
-                            ? 'border-purple-500 bg-purple-50'
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                          }
-                        `}
-                        onClick={() => handlePlayerToggle(player.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-gray-900">
-                            {player.name}
-                          </span>
-                          <div className="flex">
-                            {Array.from({ length: player.level }, (_, i) => (
-                              <div
-                                key={i}
-                                className="w-3 h-3 bg-orange-400 rounded-full ml-1"
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {selectedPlayers.length < 2 && (
-                    <p className="mt-2 text-sm text-red-600">
-                      Selecione pelo menos 2 jogadores
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex space-x-3 pt-4">
-                  <Button
-                    type="submit"
-                    disabled={form.formState.isSubmitting || selectedPlayers.length < 2}
-                  >
-                    {form.formState.isSubmitting ? 'Criando...' : 'Criar Partida'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={resetForm}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </form>
-            </CardBody>
-          </Card>
-        )}
+            <PlayerDropdownChip
+              players={players}
+              selectedPlayers={selectedPlayers}
+              onPlayersChange={handlePlayersChange}
+              error={selectedPlayers.length < 2 ? 'Selecione pelo menos 2 jogadores' : undefined}
+            />
+          </form>
+        </Modal>
 
         {/* Lista de Partidas */}
         {matches.length === 0 ? (
@@ -296,12 +260,6 @@ export default function MatchesPage() {
               <p className="text-gray-500 mb-4">
                 Comece criando sua primeira partida
               </p>
-              {players.length >= 2 && (
-                <Button onClick={() => setShowForm(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Criar Primeira Partida
-                </Button>
-              )}
             </CardBody>
           </Card>
         ) : (
