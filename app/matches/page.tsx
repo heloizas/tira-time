@@ -33,6 +33,7 @@ export default function MatchesPage() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false)
 
   const form = useForm<MatchForm>({
     defaultValues: {
@@ -55,8 +56,12 @@ export default function MatchesPage() {
       return
     }
 
+    let timeoutTriggered = false
+
     // Timeout de segurança
     const timeoutId = setTimeout(() => {
+      timeoutTriggered = true
+      setTimeoutOccurred(true)
       console.warn('Matches data load timeout')
       setLoading(false)
       toast.error('Timeout ao carregar dados')
@@ -75,7 +80,10 @@ export default function MatchesPage() {
         .eq('user_id', user.id)
         .order('date', { ascending: false })
 
-      if (matchesError) throw matchesError
+      if (!timeoutTriggered) {
+        if (matchesError) throw matchesError
+        setMatches(matchesData || [])
+      }
 
       // Carregar jogadores
       const { data: playersData, error: playersError } = await supabase
@@ -84,17 +92,28 @@ export default function MatchesPage() {
         .eq('user_id', user.id)
         .order('name')
 
-      if (playersError) throw playersError
-
-      setMatches(matchesData || [])
-      setPlayers(playersData || [])
+      if (!timeoutTriggered) {
+        if (playersError) throw playersError
+        setPlayers(playersData || [])
+        setTimeoutOccurred(false)
+      }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error)
-      toast.error('Erro ao carregar dados das partidas')
+      if (!timeoutTriggered) {
+        console.error('Erro ao carregar dados:', error)
+        toast.error('Erro ao carregar dados das partidas')
+      }
     } finally {
       clearTimeout(timeoutId)
-      setLoading(false)
+      if (!timeoutTriggered) {
+        setLoading(false)
+      }
     }
+  }
+
+  const retryLoad = () => {
+    setTimeoutOccurred(false)
+    setLoading(true)
+    loadData()
   }
 
   const handlePlayersChange = (playerIds: string[]) => {
@@ -109,10 +128,14 @@ export default function MatchesPage() {
     }
 
     try {
+      // Garantir que a data seja interpretada corretamente sem problemas de timezone
+      const selectedDate = new Date(data.date + 'T12:00:00')
+      const formattedDate = selectedDate.toISOString().split('T')[0]
+
       const { data: match, error } = await supabase
         .from('matches')
         .insert({
-          date: data.date,
+          date: formattedDate,
           user_id: user?.id
         })
         .select()
@@ -178,12 +201,41 @@ export default function MatchesPage() {
           <Button
             onClick={() => setShowModal(true)}
             className="mt-4 sm:mt-0"
-            disabled={players.length < 2}
+            disabled={players.length < 2 || timeoutOccurred}
           >
             <Plus className="w-4 h-4 mr-2" />
             Nova Partida
           </Button>
         </div>
+
+        {/* Aviso de Timeout */}
+        {timeoutOccurred && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardBody className="py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="text-orange-600">⚠️</div>
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">
+                      Timeout no carregamento das partidas
+                    </p>
+                    <p className="text-xs text-orange-600">
+                      A conexão pode estar lenta. Clique para tentar novamente.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={retryLoad}
+                  disabled={loading}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  {loading ? 'Carregando...' : 'Tentar novamente'}
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Aviso se não há jogadores suficientes */}
         {players.length < 2 && (
@@ -288,10 +340,6 @@ export default function MatchesPage() {
                           <Users className="w-4 h-4 mr-1" />
                           <span>{match.match_players?.length || 0} jogadores</span>
                         </div>
-                        <span>•</span>
-                        <span>
-                          Criada em {new Date(match.created_at).toLocaleDateString('pt-BR')}
-                        </span>
                       </div>
 
                       {/* Jogadores da partida */}

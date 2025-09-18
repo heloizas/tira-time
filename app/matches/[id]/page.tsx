@@ -33,6 +33,7 @@ export default function MatchDetailPage() {
   const [teams, setTeams] = useState<{ team1: Team; team2: Team } | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false)
 
   useEffect(() => {
     if (user && params.id) {
@@ -48,8 +49,12 @@ export default function MatchDetailPage() {
       return
     }
 
+    let timeoutTriggered = false
+
     // Timeout de segurança
     const timeoutId = setTimeout(() => {
+      timeoutTriggered = true
+      setTimeoutOccurred(true)
       console.warn('Match detail load timeout')
       setLoading(false)
       toast.error('Timeout ao carregar partida')
@@ -69,22 +74,33 @@ export default function MatchDetailPage() {
         .eq('user_id', user.id)
         .single()
 
-      if (error) throw error
-
-      setMatch(data)
-
-      // Se já existem times definidos, calcular estatísticas
-      if (data.match_players.some((mp: MatchPlayer & { players: Player }) => mp.team === 1) && data.match_players.some((mp: MatchPlayer & { players: Player }) => mp.team === 2)) {
-        calculateTeams(data.match_players)
+      if (!timeoutTriggered) {
+        if (error) throw error
+        setMatch(data)
+        // Se já existem times definidos, calcular estatísticas
+        if (data.match_players.some((mp: MatchPlayer & { players: Player }) => mp.team === 1) && data.match_players.some((mp: MatchPlayer & { players: Player }) => mp.team === 2)) {
+          calculateTeams(data.match_players)
+        }
+        setTimeoutOccurred(false)
       }
 
     } catch (error) {
-      console.error('Erro ao carregar partida:', error)
-      toast.error('Partida não encontrada')
+      if (!timeoutTriggered) {
+        console.error('Erro ao carregar partida:', error)
+        toast.error('Partida não encontrada')
+      }
     } finally {
       clearTimeout(timeoutId)
-      setLoading(false)
+      if (!timeoutTriggered) {
+        setLoading(false)
+      }
     }
+  }
+
+  const retryLoad = () => {
+    setTimeoutOccurred(false)
+    setLoading(true)
+    loadMatch()
   }
 
   const calculateTeams = (matchPlayers: Array<MatchPlayer & { players: Player }>) => {
@@ -229,13 +245,42 @@ export default function MatchDetailPage() {
             <Button
               variant="secondary"
               onClick={generateAutomaticTeams}
-              disabled={generating || match.match_players.length < 2}
+              disabled={generating || match.match_players.length < 2 || timeoutOccurred}
             >
               <Shuffle className="w-4 h-4 mr-2" />
               {generating ? 'Gerando...' : 'Gerar Times'}
             </Button>
           </div>
         </div>
+
+        {/* Aviso de Timeout */}
+        {timeoutOccurred && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardBody className="py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="text-orange-600">⚠️</div>
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">
+                      Timeout ao carregar a partida
+                    </p>
+                    <p className="text-xs text-orange-600">
+                      A conexão pode estar lenta. Clique para tentar novamente.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={retryLoad}
+                  disabled={loading}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  {loading ? 'Carregando...' : 'Tentar novamente'}
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Estatísticas da Partida */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

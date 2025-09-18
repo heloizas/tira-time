@@ -28,6 +28,7 @@ export default function DashboardPage() {
     recentMatches: []
   })
   const [loading, setLoading] = useState(true)
+  const [timeoutOccurred, setTimeoutOccurred] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -43,8 +44,12 @@ export default function DashboardPage() {
       return
     }
 
+    let timeoutTriggered = false
+
     // Timeout de segurança
     const timeoutId = setTimeout(() => {
+      timeoutTriggered = true
+      setTimeoutOccurred(true)
       console.warn('Dashboard data load timeout')
       setLoading(false)
       toast.error('Timeout ao carregar dados')
@@ -56,16 +61,14 @@ export default function DashboardPage() {
         .from('players')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-
-      if (playersError) throw playersError
+      if (!timeoutTriggered && playersError) throw playersError
 
       // Buscar total de partidas
       const { count: matchesCount, error: matchesError } = await supabase
         .from('matches')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-
-      if (matchesError) throw matchesError
+      if (!timeoutTriggered && matchesError) throw matchesError
 
       // Buscar partidas recentes com contagem de jogadores
       const { data: recentMatches, error: recentError } = await supabase
@@ -78,25 +81,36 @@ export default function DashboardPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5)
-
-      if (recentError) throw recentError
-
-      setStats({
-        totalPlayers: playersCount || 0,
-        totalMatches: matchesCount || 0,
-        recentMatches: recentMatches?.map(match => ({
-          id: match.id,
-          date: match.date,
-          playerCount: match.match_players?.length || 0
-        })) || []
-      })
+      if (!timeoutTriggered) {
+        if (recentError) throw recentError
+        setStats({
+          totalPlayers: playersCount || 0,
+          totalMatches: matchesCount || 0,
+          recentMatches: recentMatches?.map(match => ({
+            id: match.id,
+            date: match.date,
+            playerCount: match.match_players?.length || 0
+          })) || []
+        })
+        setTimeoutOccurred(false)
+      }
     } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error)
-      toast.error('Erro ao carregar dados do dashboard')
+      if (!timeoutTriggered) {
+        console.error('Erro ao carregar dados do dashboard:', error)
+        toast.error('Erro ao carregar dados do dashboard')
+      }
     } finally {
       clearTimeout(timeoutId)
-      setLoading(false)
+      if (!timeoutTriggered) {
+        setLoading(false)
+      }
     }
+  }
+
+  const retryLoad = () => {
+    setTimeoutOccurred(false)
+    setLoading(true)
+    loadDashboardData()
   }
 
   if (loading) {
@@ -119,6 +133,35 @@ export default function DashboardPage() {
             Bem-vindo de volta! Aqui está um resumo das suas atividades.
           </p>
         </div>
+
+        {/* Aviso de Timeout */}
+        {timeoutOccurred && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardBody className="py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="text-orange-600">⚠️</div>
+                  <div>
+                    <p className="text-sm font-medium text-orange-800">
+                      Timeout no carregamento do dashboard
+                    </p>
+                    <p className="text-xs text-orange-600">
+                      A conexão pode estar lenta. Clique para tentar novamente.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={retryLoad}
+                  disabled={loading}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  {loading ? 'Carregando...' : 'Tentar novamente'}
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Estatísticas */}
         <div className="grid grid-cols-2 gap-3">
